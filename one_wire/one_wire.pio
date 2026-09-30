@@ -2,43 +2,47 @@
 .side_set 1 pindirs
 
 .wrap_target
-public get_next_cmd:
+get_next_cmd:
     pull block side 0
     out pc, 5 side 0
 
 
 
-public read_bit:
-    nop side 1 [5]
-    nop side 0 [5]
-    in pins, 1 side 0 
-    set y, 2 side 0 [15]
-
-read_wait_cycle:
-    jmp y-- read_wait_cycle side 0 [15]
-    push block side 0
-    jmp get_next_cmd side 0
+public transfer_bit:
+    set y, 0 side 0
+    jmp transfer_start side 0
 
 
+public transfer_byte:
+    set y, 7 side 0
 
-public write_bit:
+transfer_start:
     pull block side 0
+
+transfer_next_bit:
     out x, 1 side 0
-    jmp !x write_zero side 1 [5]
+    jmp !x transfer_zero side 1 [5]
 
-write_one:
-    set y, 2 side 0 [15]
+transfer_one: 
+    nop side 0 [5]
+    in pins, 1 side 0
+    set x, 2 side 0 [15]
 
-write_one_wait_cycle:
-    jmp y-- write_one_wait_cycle side 0 [15]
-    jmp get_next_cmd side 0
+transfer_one_wait:
+    jmp x-- transfer_one_wait side 0 [15]
+    jmp y-- transfer_next_bit side 0
+    jmp transfer_finish side 0
 
-write_zero:
-    set y, 2 side 1 [5]
+transfer_zero:
+    set x, 2 side 1 [5]
 
-write_zero_wait_cycle:
-    jmp y-- write_zero_wait_cycle side 1 [15]
-    nop side 0 [8]
+transfer_zero_wait:
+    jmp x-- transfer_zero_wait side 1 [15]
+    in null, 1 side 0 [8]
+    jmp y-- transfer_next_bit side 0
+
+transfer_finish:
+    push block side 0
     jmp get_next_cmd side 0
 
 
@@ -50,8 +54,8 @@ reset_low:
     jmp y-- reset_low side 1 [15]
     set y, 2 side 0 [15]
 
-reset_wait_cycle:
-    jmp y-- reset_wait_cycle side 0 [15]
+reset_wait:
+    jmp y-- reset_wait side 0 [15]
     nop side 0 [5]
     in pins, 1 side 0
     set y, 23 side 0 [15]
@@ -61,4 +65,5 @@ reset_finish:
     nop side 0 [7]
     push block side 0
     jmp get_next_cmd side 0
+
 .wrap

@@ -33,12 +33,23 @@ bool OneWire_Init(OneWire *bus, uint pin){
 }
 
 
-bool OneWire_ReadBit(OneWire *bus){
-    uint32_t command= bus-> offset+onewire_offset_read_bit;
+bool OneWire_TransferBit(OneWire *bus, bool bit){
+    uint32_t command= bus->offset +onewire_offset_transfer_bit;
     pio_sm_put_blocking(bus->pio, bus->state_machine, command);
+    pio_sm_put_blocking( bus->pio, bus->state_machine, bit ? 1u:0u);
     uint32_t response= pio_sm_get_blocking( bus->pio, bus->state_machine);
 
     return (response >> 31) &1u;
+}
+
+
+bool OneWire_ReadBit(OneWire *bus){
+    return OneWire_TransferBit(bus, true);
+}
+
+
+void OneWire_WriteBit(OneWire *bus, bool bit){
+    OneWire_TransferBit(bus, bit);
 }
 
 
@@ -52,50 +63,28 @@ bool OneWire_Reset(OneWire *bus){
 }
 
 
-void OneWire_WriteBit(OneWire *bus, bool bit){
-    uint32_t command= bus->offset +onewire_offset_write_bit;
+uint8_t OneWire_TransferByte(OneWire *bus, uint8_t data){
+    uint32_t command= bus->offset +onewire_offset_transfer_byte;
     pio_sm_put_blocking(bus->pio, bus->state_machine, command);
-    pio_sm_put_blocking( bus->pio, bus->state_machine, bit ? 1u:0u);
+    pio_sm_put_blocking( bus->pio, bus->state_machine, data);
+    uint32_t response= pio_sm_get_blocking( bus->pio, bus->state_machine);
 
-    return;
-}
-
-
-void OneWire_WriteByte(OneWire *bus, uint8_t data){ 
-    for (int i=0; i<8; i++){
-        OneWire_WriteBit(bus, data & 0x01);
-        data >>= 1;
-    }
+    return (uint8_t)(response >> 24);
 }
 
 
 uint8_t OneWire_ReadByte(OneWire *bus){
-    uint8_t result = 0;
-    for (int i=0; i<8; i++){
-        result >>= 1;
-        if (OneWire_ReadBit(bus)) result |= 0x80;
-    }
-
-    return result;
+    return OneWire_TransferByte(bus,0xFFu);
 }
 
 
-uint8_t OneWire_TransferByte(OneWire *bus, uint8_t data){
-    uint8_t result =0;
-    for (int i=0; i<8; i++){
-        result >>= 1;
-        if (data & 0x01){
-            if (OneWire_ReadBit(bus)) result |= 0x80;
-        }
-        else OneWire_WriteBit(bus, false);
-        data >>= 1;
-    }
-    return result;
+void OneWire_WriteByte(OneWire *bus, uint8_t data){ 
+    OneWire_TransferByte(bus, data);
 }
 
 
 void OneWire_TransferBuffer(OneWire *bus, uint8_t *data_buffer, size_t data_len){
-    for (int i=0; i<data_len; i++){
+    for (size_t i=0; i<data_len; i++){
         data_buffer[i]= OneWire_TransferByte(bus, data_buffer[i]);
     }
 }
